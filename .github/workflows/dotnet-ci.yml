@@ -27,7 +27,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        dotnet: ['8.0.x', '7.0.x']
+        dotnet: ['8.0.x'] # Dropped 7.0.x since the Conduit project targets modern LTS .NET 8.0
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,34 +49,29 @@ jobs:
             nuget-${{ runner.os }}-
 
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore Conduit.sln
 
       - name: Build
-        run: dotnet build --no-restore -c Release
+        run: dotnet build Conduit.sln --no-restore -c Release
 
       - name: Run tests
-        run: |
-          dotnet test --no-build -c Release --logger "trx;LogFileName=test_results_${{ matrix.os }}_${{ matrix.dotnet }}.trx"
-        continue-on-error: false
+        run: dotnet test Conduit.sln --no-build -c Release --logger "trx;LogFileName=test_results.trx"
 
       - name: Publish Test Results (upload)
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: test-results-${{ matrix.os }}-${{ matrix.dotnet }}
-          path: |
-            **/TestResults/*.trx
-            **/test_results_*.trx
+          path: "**/TestResults/*.trx"
 
-      - name: Publish (self-contained output)
-        if: success()
-        run: |
-          dotnet publish -c Release -o ${{ github.workspace }}/publish --no-build
+      - name: Publish Web Project
+        run: dotnet publish src/Conduit/Conduit.csproj -c Release -o ${{ github.workspace }}/publish --no-build
 
       - name: Upload Published Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: published-app-${{ matrix.os }}-${{ matrix.dotnet }}
-          path: publish
+          path: ${{ github.workspace }}/publish
 
   pack:
     name: Pack NuGet package (optional)
