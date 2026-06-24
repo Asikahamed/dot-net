@@ -1,0 +1,108 @@
+name: ".NET / ASP.NET CI"
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - 'release/*'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & Test (matrix)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        dotnet: ['8.0.x', '7.0.x']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ matrix.dotnet }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ matrix.dotnet }}-${{ runner.os }}-${{ hashFiles('**/*.csproj', '**/global.json', '**/nuget.config') }}
+          restore-keys: |
+            nuget-${{ matrix.dotnet }}-${{ runner.os }}-
+            nuget-${{ runner.os }}-
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore -c Release
+
+      - name: Run tests
+        run: |
+          dotnet test --no-build -c Release --logger "trx;LogFileName=test_results_${{ matrix.os }}_${{ matrix.dotnet }}.trx"
+        continue-on-error: false
+
+      - name: Publish Test Results (upload)
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}-${{ matrix.dotnet }}
+          path: |
+            **/TestResults/*.trx
+            **/test_results_*.trx
+
+      - name: Publish (self-contained output)
+        if: success()
+        run: |
+          dotnet publish -c Release -o ${{ github.workspace }}/publish --no-build
+
+      - name: Upload Published Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: published-app-${{ matrix.os }}-${{ matrix.dotnet }}
+          path: publish
+
+  pack:
+    name: Pack NuGet package (optional)
+    runs-on: ubuntu-latest
+    needs: build
+    if: contains(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore and Build
+        run: |
+          dotnet restore
+          dotnet build -c Release
+
+      - name: Pack NuGet artifacts
+        run: |
+          dotnet pack -c Release --no-build -o ${{ github.workspace }}/nupkgs
+
+      - name: Upload NuGet packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkgs
+          path: nupkgs
