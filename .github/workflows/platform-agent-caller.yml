@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   platform-agent:
-    uses: Asikahamed/Platform-agent-dotnet/.github/workflows/platform-agent-reusable.yml@fix/path-issues
+    uses: Asikahamed/Platform-agent-dotnet/.github/workflows/platform-agent-reusable.yml@main
 
     with:
       app_repository: ${{ github.repository }}
