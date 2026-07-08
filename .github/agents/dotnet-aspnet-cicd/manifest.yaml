@@ -1,0 +1,11 @@
+name: ".net/asp.net CI/CD Agent"
+version: "0.1.0"
+description: "Agent to assist with CI/CD for .NET and ASP.NET Core applications. Contains prompts, instructions, and metadata."
+author: "Platform Team"
+tags:
+  - dotnet
+  - aspnet
+  - cicd
+  - github-actions
+modes:
+  - agent-definition
